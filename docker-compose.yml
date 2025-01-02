@@ -1,0 +1,70 @@
+services:
+  fastapi0:
+    build: .
+    container_name: fastapi0
+    volumes:
+      - ./:/app
+    environment:
+      - LOCAL=5000
+      - REMOTE=5001,5002,5003,5004,5005
+    ports:
+      - "5000:8000"
+    command: ["fastapi", "dev", "/app/layer1_blockchain/net.py",  "--host", "0.0.0.0", "--port", "8000"]
+
+  fastapi1:
+    build: .
+    container_name: fastapi1
+    volumes:
+      - ./:/app
+    environment:
+      - LOCAL=5001
+      - REMOTE=5000,5002,5003,5004,5005
+    ports:
+      - "5001:8000"
+    command: ["fastapi", "dev", "/app/layer1_blockchain/net.py",  "--host", "0.0.0.0", "--port", "8000"]
+
+  fastapi2:
+    build: .
+    container_name: fastapi2
+    volumes:
+      - ./:/app
+    environment:
+      - LOCAL=5002
+      - REMOTE=5001,5000,5003,5004,5005
+    ports:
+      - "5002:8000"
+    command: ["fastapi", "dev", "/app/layer1_blockchain/net.py",  "--host", "0.0.0.0", "--port", "8000"]
+
+  fastapi3:
+    build: .
+    container_name: fastapi3
+    volumes:
+      - ./:/app
+    environment:
+      - LOCAL=5003
+      - REMOTE=5001,5002,5000,5004,5005
+    ports:
+      - "5003:8000"
+    command: ["fastapi", "dev", "/app/layer1_blockchain/net.py",  "--host", "0.0.0.0", "--port", "8000"]
+
+  fastapi4:
+    build: .
+    container_name: fastapi4
+    volumes:
+      - ./:/app
+    environment:
+      - LOCAL=5004
+      - REMOTE=5001,5002,5003,5000,5005
+    ports:
+      - "5004:8000"
+    command: ["fastapi", "dev", "/app/layer1_blockchain/net.py",  "--host", "0.0.0.0", "--port", "8000"]
+
+  fastapi5:
+    build: .
+    container_name: fastapi5
+    environment:
+      - LOCAL=5005
+      - REMOTE=5001,5002,5003,5004,5000
+    ports:
+      - "5005:8000"
+    command: ["fastapi", "dev", "/app/layer1_blockchain/net.py",  "--host", "0.0.0.0", "--port", "8000"]
