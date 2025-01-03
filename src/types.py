@@ -1,8 +1,8 @@
 from typing import Optional
 from pydantic import BaseModel
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes
+from hashlib import sha256
+from src.blockchain import Blockchain
+from src.cryptography import sign_message, verify_signature
 import base64
 
 
@@ -31,65 +31,70 @@ class Transaction(BaseModel):
     tx_id: str
     sender: str
     receiver: str
+    amount: float
     inputs: list[UTXO]
     outputs: Optional[list[UTXO]]
     hash: Optional[str]
     signature: str
 
-    def create(self, sender: str, receiver: str, amount: float, signature: str):
-        input_utxos = filter_utxos(sender)
-        total_input_amount = sum([utxo.amount for utxo in input_utxos])
+    @staticmethod
+    def new(tx_id, sender, receiver, amount, signature) -> "Transaction":
+        inputs = []
+        outputs = []
 
-        # validate signature
-        if not self.verify_signature(sender):
-            raise TransactionException("Invalid signature")
+        total_input_utxos = 0
+        for input in inputs:
+            total_input_utxos += input.amount
 
-        # validate amount
-        if total_input_amount <= amount:
+        if total_input_utxos < amount:
             raise TransactionException("Not enough funds")
 
-        output_utxos = [
-            UTXO(
-                utxo_id="utxo1",
-                tx_id=self.tx_id,
-                owner=receiver,
-                amount=amount,
-                spent=False,
-            ),
-            UTXO(
-                utxo_id="utxo2",
-                tx_id=self.tx_id,
-                owner=sender,
-                amount=total_input_amount - amount,
-                spent=False,
-            ),
-        ]
+        return Transaction(
+            tx_id=tx_id,
+            sender=sender,
+            receiver=receiver,
+            amount=amount,
+            inputs=inputs,
+            outputs=None,
+            hash=None,
+            signature=signature,
+        )
 
-        self.inputs = input_utxos
-        self.outputs = output_utxos
-        self.sender = sender
-        self.receiver = receiver
+    def generate_outputs(self):
+        is_signature_valid = verify_signature(
+            self.sender, self.tx_to_sign(), self.signature
+        )
 
-        self.hash = self.hash_tx()
-        self.signature = signature
+        if not is_signature_valid:
+            raise TransactionException("Invalid signature")
 
-    def verify_signature(self, public_key: str) -> bool:
-        public_key_bytes = base64.b64decode(public_key[1:])
-        pk = Ed25519PublicKey.from_public_bytes(public_key_bytes)
+        total_input_utxos = self.total_input_utxos(self.inputs)
 
-        try:
-            pk.verify(
-                self.__to_bytes(self.signature), self.__to_bytes(self.tx_to_sign())
-            )
-            return True
-        except InvalidSignature:
-            return False
+        new_output_utxo = UTXO(
+            utxo_id=f"0@{self.tx_id}",
+            tx_id=self.tx_id,
+            owner=self.receiver,
+            amount=self.amount,
+            spent=False,
+        )
+        change_utxo = UTXO(
+            utxo_id=f"1@{self.tx_id}",
+            tx_id=self.tx_id,
+            owner=self.sender,
+            amount=total_input_utxos - self.amount,
+            spent=False,
+        )
+
+        self.outputs = [new_output_utxo, change_utxo]
 
     def hash_tx(self) -> str:
-        msg = self.__to_bytes(self.tx_to_hash())
-        digest = hashes.Hash(hashes.SHA256())
-        digest.update(msg)
-        return self.__from_bytes(digest.finalize())
+        return sha256(self.tx_to_hash().encode()).hexdigest()
+
+    def sign_tx(self) -> str:
+        return sign_message(self.sender, self.tx_to_sign())
+
+    def verify_signature(self, public_key: str) -> bool:
+        return verify_signature(public_key, self.tx_to_sign(), self.signature)
 
     def tx_to_hash(self):
         return self.model_dump_json(exclude={"hash"})
@@ -97,11 +102,12 @@ class Transaction(BaseModel):
     def tx_to_sign(self):
         return self.model_dump_json(exclude={"signature", "hash", "output"})
 
-    def __to_bytes(self, message) -> bytes:
-        return base64.b64decode(message)
+    def total_input_utxos(self, inputs: list[UTXO]):
+        total = 0
+        for input in inputs:
+            total += input.amount
 
-    def __from_bytes(self, byte_message: bytes) -> str:
-        return base64.b64encode(byte_message).decode("utf-8")
+        return total
 
 
 def filter_utxos(address, spent=False) -> list["UTXO"]:
