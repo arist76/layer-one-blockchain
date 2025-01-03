@@ -6,17 +6,17 @@ from cryptography.hazmat.primitives import hashes
 import base64
 
 
-def filter_utxos(address, spent=False) -> list["UTXO"]:
-    return [
-        # private key = xz8XHacl+NPTmTSXWEXeQKQnYc8yQg4rKEBqv3UG15Y=
-        UTXO(
-            utxo_id="utxo0",
-            tx_id="tx0",
-            owner="0x27ZXaqHrynvRZ/fdYKMRwN2nyPwxcZn8QGVzVrHeLkQ=",
-            amount=100,
-            spent=False,
-        )
-    ]
+class Node(BaseModel):
+    id: str
+    address: str
+
+
+class Block(BaseModel):
+    index: int
+    timestamp: float
+    transactions: list["Transaction"]
+    nonce: int
+    previous_hash: str
 
 
 class UTXO(BaseModel):
@@ -102,6 +102,18 @@ class Transaction(BaseModel):
 
     def __from_bytes(self, byte_message: bytes) -> str:
         return base64.b64encode(byte_message).decode("utf-8")
+
+
+def filter_utxos(address, spent=False) -> list["UTXO"]:
+    return [
+        UTXO(
+            utxo_id="utxo0",
+            tx_id="tx0",
+            owner="0x27ZXaqHrynvRZ/fdYKMRwN2nyPwxcZn8QGVzVrHeLkQ=",
+            amount=100,
+            spent=False,
+        )
+    ]
 
 
 class TransactionException(Exception):
