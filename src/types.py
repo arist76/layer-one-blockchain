@@ -44,6 +44,8 @@ class Transaction(BaseModel):
         """
         Creates a new transaction.
         """
+        assert len(inputs) > 0
+        assert amount > 0
 
         tx = Transaction(
             tx_id=tx_id,
@@ -83,7 +85,13 @@ class Transaction(BaseModel):
         return tx
 
     def is_valid(self) -> bool:
-        return self.is_amount_valid() and self.is_signature_valid()
+        return (
+            self.is_amount_valid()
+            and self.is_hash_valid()
+            and self.is_signature_valid()
+            and len(self.inputs) > 0
+            and self.amount > 0
+        )
 
     def is_amount_valid(self) -> bool:
         total_input_utxos = self.total_input_utxos()
@@ -97,6 +105,9 @@ class Transaction(BaseModel):
             self.sender, self.tx_to_sign(), self.signature
         )
         return not is_signature_valid
+
+    def is_hash_valid(self) -> bool:
+        return self.hash == self.hash_tx()
 
     def hash_tx(self) -> str:
         return sha256(self.tx_to_hash().encode()).hexdigest()
