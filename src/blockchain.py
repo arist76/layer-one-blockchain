@@ -7,6 +7,14 @@ class Blockchain:
     def __init__(self):
         self.chain: list[Block] = []
         self.current_transactions: list[Transaction] = []
-        self.nodes: list[Node] = []
-        self.create_block(proof=100, previous_hash="1")  # Genesis block
+        self.remote_nodes: list[Node] = []
+        self.local_node: Node = Node(node_id=0, host="localhost", port=5000)
 
+    def create_block():
+        pass
+
+    def verify_block(self, block):
+        pass
+
+    def mine_block(self):
+        pass

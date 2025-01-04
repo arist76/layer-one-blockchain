@@ -1,7 +1,7 @@
 from ecdsa import SigningKey, VerifyingKey, SECP256k1
 
 
-def generate_key():
+def generate_key() -> tuple[str, str]:
     """
     Generate a new private key and its corresponding public key.
 
@@ -15,7 +15,7 @@ def generate_key():
     return private_key_hex, public_key_hex
 
 
-def sign_message(private_key_hex, message):
+def sign_message(private_key_hex, message) -> str:
     """
     Sign a message using the given private key.
 
@@ -32,7 +32,7 @@ def sign_message(private_key_hex, message):
     return signature.hex()
 
 
-def verify_signature(public_key_hex, message, signature):
+def verify_signature(public_key_hex, message, signature) -> bool:
     """
     Verify a signature against a message and a public key.
 

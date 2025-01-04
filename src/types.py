@@ -1,14 +1,16 @@
 from typing import Optional
 from pydantic import BaseModel
 from hashlib import sha256
-from src.blockchain import Blockchain
 from src.cryptography import sign_message, verify_signature
-import base64
 
 
 class Node(BaseModel):
     id: str
     address: str
+
+    @staticmethod
+    def discover_nodes() -> list["Node"]:
+        return []
 
 
 class Block(BaseModel):
@@ -33,59 +35,68 @@ class Transaction(BaseModel):
     receiver: str
     amount: float
     inputs: list[UTXO]
-    outputs: Optional[list[UTXO]]
-    hash: Optional[str]
+    outputs: list[UTXO]
+    hash: str
     signature: str
 
     @staticmethod
-    def new(tx_id, sender, receiver, amount, signature) -> "Transaction":
-        inputs = []
-        outputs = []
+    def new(tx_id, sender, receiver, amount, inputs, signature) -> "Transaction":
+        """
+        Creates a new transaction.
+        """
 
-        total_input_utxos = 0
-        for input in inputs:
-            total_input_utxos += input.amount
-
-        if total_input_utxos < amount:
-            raise TransactionException("Not enough funds")
-
-        return Transaction(
+        tx = Transaction(
             tx_id=tx_id,
             sender=sender,
             receiver=receiver,
             amount=amount,
             inputs=inputs,
-            outputs=None,
-            hash=None,
+            outputs=[],
+            hash="",
             signature=signature,
         )
 
-    def generate_outputs(self):
-        is_signature_valid = verify_signature(
-            self.sender, self.tx_to_sign(), self.signature
-        )
+        if tx.is_amount_valid():
+            raise TransactionException("Not enough funds")
 
-        if not is_signature_valid:
+        if tx.is_signature_valid():
             raise TransactionException("Invalid signature")
 
-        total_input_utxos = self.total_input_utxos(self.inputs)
-
+        total_input_utxos = tx.total_input_utxos()
         new_output_utxo = UTXO(
-            utxo_id=f"0@{self.tx_id}",
-            tx_id=self.tx_id,
-            owner=self.receiver,
-            amount=self.amount,
+            utxo_id=f"0@{tx.tx_id}",
+            tx_id=tx.tx_id,
+            owner=tx.receiver,
+            amount=tx.amount,
             spent=False,
         )
         change_utxo = UTXO(
-            utxo_id=f"1@{self.tx_id}",
-            tx_id=self.tx_id,
-            owner=self.sender,
-            amount=total_input_utxos - self.amount,
+            utxo_id=f"1@{tx.tx_id}",
+            tx_id=tx.tx_id,
+            owner=tx.sender,
+            amount=total_input_utxos - tx.amount,
             spent=False,
         )
+        tx.outputs = [new_output_utxo, change_utxo]
+        tx.hash = tx.hash_tx()
 
-        self.outputs = [new_output_utxo, change_utxo]
+        return tx
+
+    def is_valid(self) -> bool:
+        return self.is_amount_valid() and self.is_signature_valid()
+
+    def is_amount_valid(self) -> bool:
+        total_input_utxos = self.total_input_utxos()
+        return total_input_utxos < self.amount
+
+    def is_signature_valid(self) -> bool:
+        if self.signature == "":
+            return False
+
+        is_signature_valid = verify_signature(
+            self.sender, self.tx_to_sign(), self.signature
+        )
+        return not is_signature_valid
 
     def hash_tx(self) -> str:
         return sha256(self.tx_to_hash().encode()).hexdigest()
@@ -102,24 +113,12 @@ class Transaction(BaseModel):
     def tx_to_sign(self):
         return self.model_dump_json(exclude={"signature", "hash", "output"})
 
-    def total_input_utxos(self, inputs: list[UTXO]):
+    def total_input_utxos(self):
         total = 0
-        for input in inputs:
+        for input in self.inputs:
             total += input.amount
 
         return total
-
-
-def filter_utxos(address, spent=False) -> list["UTXO"]:
-    return [
-        UTXO(
-            utxo_id="utxo0",
-            tx_id="tx0",
-            owner="0x27ZXaqHrynvRZ/fdYKMRwN2nyPwxcZn8QGVzVrHeLkQ=",
-            amount=100,
-            spent=False,
-        )
-    ]
 
 
 class TransactionException(Exception):
