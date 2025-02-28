@@ -1,24 +1,6 @@
-from typing import Optional
 from pydantic import BaseModel
 from hashlib import sha256
 from src.cryptography import sign_message, verify_signature
-
-
-class Node(BaseModel):
-    id: str
-    address: str
-
-    @staticmethod
-    def discover_nodes() -> list["Node"]:
-        return []
-
-
-class Block(BaseModel):
-    index: int
-    timestamp: float
-    transactions: list["Transaction"]
-    nonce: int
-    previous_hash: str
 
 
 class UTXO(BaseModel):
@@ -46,6 +28,7 @@ class Transaction(BaseModel):
         """
         assert len(inputs) > 0
         assert amount > 0
+        assert all([input.owner == sender and input.spent for input in inputs])
 
         tx = Transaction(
             tx_id=tx_id,
@@ -79,6 +62,9 @@ class Transaction(BaseModel):
             amount=total_input_utxos - tx.amount,
             spent=False,
         )
+        for utxo in tx.inputs:
+            utxo.spent = True
+
         tx.outputs = [new_output_utxo, change_utxo]
         tx.hash = tx.hash_tx()
 
@@ -91,6 +77,9 @@ class Transaction(BaseModel):
             and self.is_signature_valid()
             and len(self.inputs) > 0
             and self.amount > 0
+            and all(
+                [input.owner == self.sender and input.spent for input in self.inputs]
+            )
         )
 
     def is_amount_valid(self) -> bool:
@@ -130,6 +119,23 @@ class Transaction(BaseModel):
             total += input.amount
 
         return total
+
+
+class Block(BaseModel):
+    index: int
+    timestamp: float
+    transactions: list["Transaction"]
+    nonce: int
+    previous_hash: str
+
+
+class Node(BaseModel):
+    node_id: int
+    host: str
+    port: int
+
+    def connect_to_network(self) -> list["Node"]:
+        return []
 
 
 class TransactionException(Exception):
